@@ -291,10 +291,18 @@ export const register: Register = on => {
       name: 'prs',
       description: 'Open the Pull Requests page (optionally: repos, review, authored, involved, refresh)',
       argumentHint: '[repos|review|authored|involved|refresh]',
+      // Opens the page even while Claude is mid-turn.
+      immediate: true,
     })
     void refresh($)
     $.clock.every(REFRESH_MS, () => void refresh($, { isQuiet: true }))
 
+    return next(e)
+  })
+
+  // /clear, /resume and /branch reset $.state without a new session.start: fetch again.
+  on('classic.SessionStart', { source: ['clear', 'resume', 'fork'] }, async ($, e, next) => {
+    void refresh($)
     return next(e)
   })
 

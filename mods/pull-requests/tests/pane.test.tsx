@@ -131,3 +131,32 @@ test('lists, opens, summarizes and merges a pull request', async ($, on) => {
     await ui.unmount()
   }
 })
+
+test('the band comes back with the list after /clear', async ($, on) => {
+  on('env.get', (_$, e) => ({ value: e.name === 'GITHUB_TOKEN' ? 'test-token' : undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('classic.SessionStart', () => ({}))
+  // Stands in for the engine's own (empty) band when the mod has nothing to show.
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box key="engine-band" />
+  })
+  on('http.fetch', (_$, e) => {
+    const body = JSON.parse(e.init?.body ?? '{}')
+    if (body.query?.includes('viewer')) return ok({ data: { viewer: { login: 'me' } } })
+    return ok({ data: { search: { nodes: [PR_NODE] } } })
+  })
+
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const band = await $.ui.mount({
+      plugin: 'pull-requests',
+      surface,
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 80, scroll: { offset: 0, bodyRows: 4 }, view: {} },
+    })
+    await $.classic.SessionStart({ source: 'clear' })
+    expect((await band.find({ key: 'open-prs' }))?.props.label).toBe('⇄ Pull Requests (1)')
+    expect(await band.find({ type: 'Text', text: /1 ready to merge/ })).toBeDefined()
+    await band.unmount()
+  }
+})

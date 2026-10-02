@@ -5,8 +5,10 @@ A **Pull Requests** page inside Claude Code (desktop Code tab and terminal): all
 ## Opening it
 
 - The **⇄ Pull Requests (N)** button above the prompt (it also shows how many are ready to merge or failing; `×` hides it for the session)
-- `/prs`, or `/prs review|authored|involved|repos` to jump to a tab, or `/prs refresh` to re-read your GitHub login
+- `/prs` (works even while Claude is mid-turn), or `/prs review|authored|involved|repos` to jump to a tab, or `/prs refresh` to re-read your GitHub login
 - The status line shows the open count; the list refreshes every 5 minutes and toasts when a new PR shows up
+
+Mods can't add items to the Desktop app's own sidebar: they draw in a pane, the band above the prompt, toasts, the status line and Claude Code's own rows (see [Draw in the interface](https://code.claude.com/docs/en/plugins/mods/interface)). The page opens as a pane docked beside the chat.
 
 ## The page
 
