@@ -37,6 +37,8 @@ const PR_NODE = {
 
 const res = (status: number, text: string) => ({ value: { status, ok: status < 300, headers: {}, text } })
 const ok = (body: unknown) => res(200, JSON.stringify(body))
+// Request bodies the mod sends are JSON text.
+const textOf = (body: string | { readonly base64: string } | undefined) => (typeof body === 'string' ? body : '{}')
 
 test('lists, opens, summarizes and merges a pull request', async ($, on) => {
   const calls: string[] = []
@@ -64,7 +66,7 @@ test('lists, opens, summarizes and merges a pull request', async ($, on) => {
     expect(e.init?.headers?.Authorization).toBe('Bearer test-token')
 
     if (path === '/graphql') {
-      const body = JSON.parse(e.init?.body ?? '{}')
+      const body = JSON.parse(textOf(e.init?.body))
       if (body.query.includes('viewer')) return ok({ data: { viewer: { login: 'me' } } })
       return ok({ data: { search: { nodes: isMerged ? [] : [PR_NODE] } } })
     }
@@ -142,7 +144,7 @@ test('the band comes back with the list after /clear', async ($, on) => {
     return <Box key="engine-band" />
   })
   on('http.fetch', (_$, e) => {
-    const body = JSON.parse(e.init?.body ?? '{}')
+    const body = JSON.parse(textOf(e.init?.body))
     if (body.query?.includes('viewer')) return ok({ data: { viewer: { login: 'me' } } })
     return ok({ data: { search: { nodes: [PR_NODE] } } })
   })
@@ -152,11 +154,31 @@ test('the band comes back with the list after /clear', async ($, on) => {
       plugin: 'pull-requests',
       surface,
       component: 'AbovePrompt',
-      props: { hasSurvey: false, isWorking: false, maxRows: 4, bodyColumns: 80, scroll: { offset: 0, bodyRows: 4 }, view: {} },
+      props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 4, bodyColumns: 80, scroll: { offset: 0, bodyRows: 4 }, view: {} },
     })
     await $.classic.SessionStart({ source: 'clear' })
     expect((await band.find({ key: 'open-prs' }))?.props.label).toBe('⇄ Pull Requests (1)')
     expect(await band.find({ type: 'Text', text: /1 ready to merge/ })).toBeDefined()
     await band.unmount()
   }
+})
+
+test('GITHUB_API_URL sends REST and GraphQL to GitHub Enterprise', async ($, on) => {
+  const urls: string[] = []
+  const env: Record<string, string> = { GITHUB_TOKEN: 'test-token', GITHUB_API_URL: 'https://ghe.example.com/api/v3/' }
+  on('env.get', (_$, e) => ({ value: env[e.name] }))
+  on('ui.status', () => ({ value: undefined }))
+  on('http.fetch', (_$, e) => {
+    urls.push(e.url)
+    const body = JSON.parse(textOf(e.init?.body))
+    if (body.query?.includes('viewer')) return ok({ data: { viewer: { login: 'me' } } })
+    if (e.url.endsWith('/graphql')) return ok({ data: { search: { nodes: [PR_NODE] } } })
+    return ok({ body: '', head: { sha: 'abc123' }, mergeable_state: 'clean' })
+  })
+
+  const ui = await $.ui.mount({ plugin: 'pull-requests', surface: 'desktop', ...PANE })
+  await ui.press({ key: 'refresh' })
+  expect(urls).toContain('https://ghe.example.com/api/graphql')
+  expect(urls.every(url => url.startsWith('https://ghe.example.com/api/'))).toBe(true)
+  await ui.unmount()
 })

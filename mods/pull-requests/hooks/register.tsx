@@ -156,7 +156,11 @@ function gh($: $): GitHubRequest {
       init.body = JSON.stringify(body)
     }
 
-    const res = await $.http.fetch(`${API}${path}`, init)
+    // GITHUB_API_URL points at GitHub Enterprise (https://ghe.example.com/api/v3) or a local stand-in.
+    const base = ((await $.env.get('GITHUB_API_URL')) || API).replace(/\/+$/, '')
+    // Enterprise serves GraphQL at /api/graphql, beside (not under) /api/v3.
+    const url = path === '/graphql' && base.endsWith('/api/v3') ? `${base.slice(0, -'/v3'.length)}/graphql` : `${base}${path}`
+    const res = await $.http.fetch(url, init)
     if (res.status === 401) token = null
     if (!res.ok) throw new Error(errorText(res.status, res.text))
 
@@ -576,29 +580,30 @@ export const register: Register = on => {
             )}
           </Box>
 
-          <Box flexDirection="row" flexWrap="wrap" gap={1} alignItems="center">
-            <Select
-              key="merge-method"
-              label="Merge method"
-              value={method}
-              options={[
-                { value: 'squash', label: 'Squash and merge' },
-                { value: 'merge', label: 'Create a merge commit' },
-                { value: 'rebase', label: 'Rebase and merge' },
-              ]}
-              onSelect={(value: string) => update($, mergeMethod, () => value as PrMergeMethod)}
-            />
-            {pending === 'merge' ? (
-              <>
-                <Button
-                  key="confirm-merge"
-                  label={`Confirm: ${method} into ${pr.baseRef}`}
-                  variant="primary"
-                  onPress={() => act($, pr, 'Merged', () => mergePr(gh($), pr, method))}
-                />
-                <Button key="cancel-merge" label="Cancel" onPress={() => update($, confirm, () => null)} />
-              </>
-            ) : (
+          <Select
+            key="merge-method"
+            label="Merge method"
+            value={method}
+            options={[
+              { value: 'squash', label: 'Squash and merge' },
+              { value: 'merge', label: 'Create a merge commit' },
+              { value: 'rebase', label: 'Rebase and merge' },
+            ]}
+            onSelect={(value: string) => update($, mergeMethod, () => value as PrMergeMethod)}
+          />
+          <Box flexDirection="row" flexWrap="wrap" gap={1}>
+            {pending === 'merge' && (
+              <Button
+                key="confirm-merge"
+                label={`Confirm: ${method} into ${pr.baseRef}`}
+                variant="primary"
+                onPress={() => act($, pr, 'Merged', () => mergePr(gh($), pr, method))}
+              />
+            )}
+            {pending === 'merge' && (
+              <Button key="cancel-merge" label="Cancel" onPress={() => update($, confirm, () => null)} />
+            )}
+            {pending !== 'merge' && (
               <Button
                 key="merge"
                 label="⇢ Merge"
@@ -612,12 +617,13 @@ export const register: Register = on => {
                 }}
               />
             )}
-            {pending === 'close' ? (
-              <>
-                <Button key="confirm-close" label="Confirm close" onPress={() => act($, pr, 'Closed', () => closePr(gh($), pr))} />
-                <Button key="cancel-close" label="Cancel" onPress={() => update($, confirm, () => null)} />
-              </>
-            ) : (
+            {pending === 'close' && (
+              <Button key="confirm-close" label="Confirm close" onPress={() => act($, pr, 'Closed', () => closePr(gh($), pr))} />
+            )}
+            {pending === 'close' && (
+              <Button key="cancel-close" label="Cancel" onPress={() => update($, confirm, () => null)} />
+            )}
+            {pending !== 'close' && (
               <Button key="close" label="Close PR" dimColor onPress={() => update($, confirm, () => 'close')} />
             )}
           </Box>
