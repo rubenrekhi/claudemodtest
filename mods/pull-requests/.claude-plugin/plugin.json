@@ -1,0 +1,7 @@
+{
+  "name": "pull-requests",
+  "version": "0.1.0",
+  "description": "A Pull Requests page for Claude Code: every open PR across your GitHub repos, with diffs, reviews, merging and Claude-powered review.",
+  "author": { "name": "Ruben Rekhi" },
+  "types": "./types/index.d.ts"
+}
